@@ -20,7 +20,7 @@ app.post('/api/ipsetadd', (req, res) => {
         return res.status(403).send('Forbidden');
     }
 
-    exec(`sudo ipset add ${ipsetName} ${ipplayer}`, (error, stdout, stderr) => {
+    exec(`sudo ipset add whitelist  ${ipplayer}`, (error, stdout, stderr) => {
         if (error) {
             return res.status(500).send(`Error adding IP to ipset: ${stderr}`);
         }
@@ -38,7 +38,7 @@ app.post('/api/ipsetdel', (req, res) => {
         return res.status(403).send('Forbidden');
     }
 
-    exec(`sudo ipset del ${ipsetName} ${ipplayer}`, (error, stdout, stderr) => {
+    exec(`sudo ipset del whitelist ${ipplayer}`, (error, stdout, stderr) => {
         if (error) {
             return res.status(500).send(`Error removing IP from ipset: ${stderr}`);
         }
