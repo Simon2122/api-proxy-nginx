@@ -1,91 +1,74 @@
 const express = require('express');
-const fs = require('fs');
 const { exec } = require('child_process');
+const { promisify } = require('util');
 const app = express();
 const port = 8080;
 const SECRET_KEY = 'afterlife897787';
 
-app.use(express.json());
+const whitelist = new Set([
+    "148.113.173.203", // Load Balancer
+    "15.235.119.145",  // Server Live
+    "173.177.246.105"  // Home
+]);
 
-app.post('/api/proxy/change/port', (req, res) => {
-    const { APIKEY, realip, realport } = req.body;
+const promisifiedExec = promisify(exec);
 
-    if (!realip || !realport || !APIKEY) {
-        return res.status(400).json({ error: 'Invalid Request' });
-    }
-    if (SECRET_KEY !== APIKEY) {
-        return res.status(403).json({ error: 'Forbiden' });
-    }
-
-    const nginxConfPath = '/etc/nginx/nginx.conf';
-    const streamConfPath = '/etc/nginx/stream.conf';
-
+async function runCommand(command) {
     try {
-        // Read and update nginx.conf
-        let nginxConf = fs.readFileSync(nginxConfPath, 'utf8');
-        const upstreamPattern = /server\s+([0-9\.]+):([0-9]+)/g;
-        nginxConf = nginxConf.replace(upstreamPattern, `server ${realip}:${realport}`);
-        fs.writeFileSync(nginxConfPath, nginxConf, 'utf8');
-
-        // Read and update stream.conf (if applicable)
-        let streamConf = fs.readFileSync(streamConfPath, 'utf8');
-        streamConf = streamConf.replace(upstreamPattern, `server ${realip}:${realport}`);
-        fs.writeFileSync(streamConfPath, streamConf, 'utf8');
-
-        // Reload Nginx to apply changes
-        exec('sudo systemctl restart nginx', (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error reloading Nginx: ${stderr}`);
-                return res.status(500).json({ error: 'Failed to reload Nginx' });
-            }
-
-            // Respond with success
-            res.status(200).json({ message: 'Configuration updated successfully' });
-        });
-
+        const { stdout, stderr } = await promisifiedExec(command);
+        if (stderr) {
+            console.error(`Error executing command '${command}': ${stderr}`);
+        } else {
+            console.log(`Executed: ${command}`);
+        }
     } catch (error) {
-        console.error('Error updating configuration:', error);
-        res.status(500).json({ error: 'Failed to update configuration' });
+        console.error(`Execution error: ${error.message}`);
     }
-});
-app.post('/api/ipsetadd', (req, res) => {
-    const { key, ipplayer } = req.body;
+}
 
+async function firewallInit() {
+    const commands = [
+        "iptables -F",
+        "iptables -A INPUT -i lo -j ACCEPT",
+        ...Array.from(whitelist, ip => `iptables -A INPUT -s ${ip} -j ACCEPT`),
+        "iptables -A INPUT -p udp -m multiport --dports 10000:60000 -j ACCEPT",
+        "iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -j ACCEPT",
+        "iptables -A INPUT -j DROP"
+    ];
+
+    for (const command of commands) {
+        await runCommand(command);
+    }
+}
+
+async function handleIpSetOperation(req, res, operation) {
+    const { key, ipplayer } = req.body;
+    console.log(key, ipplayer)
     if (!key || !ipplayer) {
         return res.status(400).send('Invalid Request');
     }
     if (key !== SECRET_KEY) {
         return res.status(403).send('Forbidden');
     }
+    try {
+        await promisifiedExec(`sudo ipset ${operation} whitelist ${ipplayer}`);
+        res.status(200).send(`IP ${operation === 'add' ? 'added to' : 'removed from'} whitelist`);
+    } catch (error) {
+        res.status(500).send(`Error ${operation === 'add' ? 'adding' : 'removing'} IP from ipset: ${error.message}`);
+    }
+}
 
-    exec(`sudo ipset add whitelist ${ipplayer}`, (error, stdout, stderr) => {
-        if (error) {
-            return res.status(500).send(`Error adding IP to ipset: ${stderr}`);
-        }
 
-        res.status(200).send('IP added to whitelist');
-    });
+app.use(express.json());
+app.post('/api/ipsetadd', (req, res) => {
+    handleIpSetOperation(req, res, 'add')
 });
 app.post('/api/ipsetdel', (req, res) => {
-    const { key, ipplayer } = req.body;
-
-    if (!key || !ipplayer) {
-        return res.status(400).send('Invalid Request');
-    }
-    if (key !== SECRET_KEY) {
-        return res.status(403).send('Forbidden');
-    }
-
-    exec(`sudo ipset del whitelist ${ipplayer}`, (error, stdout, stderr) => {
-        if (error) {
-            return res.status(500).send(`Error removing IP from ipset: ${stderr}`);
-        }
-
-        res.status(200).send('IP removed from whitelist');
-    });
+    handleIpSetOperation(req, res, 'del')
 });
-
 
 app.listen(port, () => {
+    firewallInit();
     console.log(`Proxy API listening on port ${port}`);
 });
+
