@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const app = express();
@@ -12,6 +13,7 @@ const whitelist = new Set([
 ]);
 
 const promisifiedExec = promisify(exec);
+const promisifiedWriteFile = promisify(fs.writeFile);
 
 async function runCommand(command) {
     try {
@@ -31,8 +33,8 @@ async function firewallInit() {
         "iptables -F",
         "iptables -A INPUT -i lo -j ACCEPT",
         ...Array.from(whitelist, ip => `iptables -A INPUT -s ${ip} -j ACCEPT`),
-        "iptables -A INPUT -p udp -m multiport --dports 10000:60000 -j ACCEPT",
-        "iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -j ACCEPT",
+        "iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+        "iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
         "iptables -A INPUT -j DROP"
     ];
 
@@ -43,13 +45,14 @@ async function firewallInit() {
 
 async function handleIpSetOperation(req, res, operation) {
     const { key, ipplayer } = req.body;
-    console.log(key, ipplayer)
+
     if (!key || !ipplayer) {
         return res.status(400).send('Invalid Request');
     }
     if (key !== SECRET_KEY) {
         return res.status(403).send('Forbidden');
     }
+
     try {
         await promisifiedExec(`sudo ipset ${operation} whitelist ${ipplayer}`);
         res.status(200).send(`IP ${operation === 'add' ? 'added to' : 'removed from'} whitelist`);
@@ -58,17 +61,139 @@ async function handleIpSetOperation(req, res, operation) {
     }
 }
 
-
 app.use(express.json());
-app.post('/api/ipsetadd', (req, res) => {
-    handleIpSetOperation(req, res, 'add')
-});
-app.post('/api/ipsetdel', (req, res) => {
-    handleIpSetOperation(req, res, 'del')
+
+app.post('/api/ipsetadd', (req, res) => handleIpSetOperation(req, res, 'add'));
+app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
+
+app.post('/api/proxy/change/port', async (req, res) => {
+    const {
+        key,
+        newport,
+        myip,
+        connectport,
+        loadbalancer,
+        domainname,
+        realip,
+        realport
+    } = req.body;
+
+    // Check if any required parameter is missing
+    if (![key, newport, myip, connectport, loadbalancer, domainname, realip, realport].every(Boolean)) {
+        return res.status(400).send("ERROR: Missing required parameters\n");
+    }
+    if (key !== SECRET_KEY) {
+        return res.status(403).send('Forbidden');
+    }
+
+    const nginxConfig = `
+        user www-data;
+        worker_processes auto;
+        error_log  /var/log/nginx/error.log notice;
+        pid /run/nginx.pid;
+        include /etc/nginx/modules-enabled/*.conf;
+
+        worker_rlimit_nofile 65535;
+
+        events {
+            worker_connections 65535;
+            multi_accept on;
+        }
+
+        http {
+            include       /etc/nginx/mime.types;
+            default_type  application/octet-stream;
+            ssl_protocols TLSv1.2;
+            log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                            '$status $body_bytes_sent "$http_referer" '
+                            '"$http_user_agent" "$http_x_forwarded_for"';
+
+            access_log  /var/log/nginx/access.log  main;
+
+            keepalive_timeout 65;
+            sendfile on;
+            tcp_nopush on;
+            tcp_nodelay on;
+            types_hash_max_size 2048;
+            include /etc/nginx/web.conf;
+        }
+
+        include /etc/nginx/stream.conf;
+    `;
+
+    const streamConfig = `
+        stream {
+            upstream backend {
+                server ${realip}:${realport};
+            }
+            server {
+                listen ${newport};
+                proxy_socket_keepalive on;
+                proxy_pass backend;
+            }
+            server {
+                listen ${newport} udp reuseport;
+                proxy_socket_keepalive on;
+                proxy_pass backend;
+            }
+        }
+    `;
+
+    const webConfig = `
+        upstream backend {
+            server ${realip}:${realport};
+        }
+
+        server {
+            listen ${connectport};
+            server_name ${domainname};
+
+            location / {
+                proxy_set_header Host $host;
+                set_real_ip_from ${loadbalancer};
+                real_ip_header CF-Connecting-IP;					
+                proxy_set_header X-Real-IP ${myip}-$remote_addr;
+                proxy_set_header X-Forwarded-For ${myip}-$remote_addr;
+                proxy_pass_request_headers on;
+                proxy_http_version 1.1;
+                proxy_pass http://backend$request_uri;
+            }
+
+            location /client {
+                proxy_set_header Host $host;
+                set_real_ip_from ${loadbalancer};
+                real_ip_header CF-Connecting-IP;					
+                proxy_set_header X-Real-IP ${myip}-$remote_addr;
+                proxy_set_header X-Forwarded-For ${myip}-$remote_addr;
+                proxy_pass_request_headers on;
+                proxy_http_version 1.1;
+                proxy_pass http://backend/client;
+                # Only POST on /client !
+                limit_except POST {
+                    deny  all;
+                }
+            }
+        }
+    `;
+
+    try {
+        // Write configuration files sequentially
+        await promisifiedWriteFile("/etc/nginx/nginx.conf", nginxConfig);
+        await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
+        await promisifiedWriteFile("/etc/nginx/sites-enabled/web.conf", webConfig);
+
+        // Flush IP set and restart nginx
+        await promisifiedExec("sudo ipset flush whitelist");
+        await promisifiedExec("sudo systemctl restart nginx");
+
+        res.status(200).send(`OK ${newport}\n`);
+    } catch (error) {
+        console.error(`Error: ${error.message}`);
+        res.status(500).send("ERROR\n");
+    }
 });
 
 app.listen(port, () => {
     firewallInit();
     console.log(`Proxy API listening on port ${port}`);
 });
-
