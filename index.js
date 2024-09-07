@@ -180,7 +180,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
         // Write configuration files sequentially
         await promisifiedWriteFile("/etc/nginx/nginx.conf", nginxConfig);
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
-        await promisifiedWriteFile("/etc/nginx/sites-enabled/web.conf", webConfig);
+        await promisifiedWriteFile("/etc/nginx/web.conf", webConfig);
 
         // Flush IP set and restart nginx
         await promisifiedExec("sudo ipset flush whitelist");
