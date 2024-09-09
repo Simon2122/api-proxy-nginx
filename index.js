@@ -160,6 +160,9 @@ app.post('/api/proxy/change/port', async (req, res) => {
             }
 
             location /client {
+                allow ${loadbalancer};
+                deny all;
+
                 proxy_set_header Host $host;
                 set_real_ip_from ${loadbalancer};
                 real_ip_header CF-Connecting-IP;					
@@ -177,12 +180,10 @@ app.post('/api/proxy/change/port', async (req, res) => {
     `;
 
     try {
-        // Write configuration files sequentially
         await promisifiedWriteFile("/etc/nginx/nginx.conf", nginxConfig);
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
         await promisifiedWriteFile("/etc/nginx/web.conf", webConfig);
 
-        // Flush IP set and restart nginx
         await promisifiedExec("sudo ipset flush whitelist");
         await promisifiedExec("sudo systemctl restart nginx");
 
