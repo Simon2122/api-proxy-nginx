@@ -67,18 +67,8 @@ app.post('/api/ipsetadd', (req, res) => handleIpSetOperation(req, res, 'add'));
 app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
 
 app.post('/api/proxy/change/port', async (req, res) => {
-    const {
-        key,
-        newport,
-        myip,
-        connectport,
-        loadbalancer,
-        domainname,
-        realip,
-        realport
-    } = req.body;
+    const { key, newport, myip, connectport, loadbalancer, domainname, realip, realport } = req.body;
 
-    // Check if any required parameter is missing
     if (![key, newport, myip, connectport, loadbalancer, domainname, realip, realport].every(Boolean)) {
         return res.status(400).send("ERROR: Missing required parameters\n");
     }
@@ -139,7 +129,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
         }
     `;
 
-    const webConfig = `
+    /*const webConfig = `
         upstream backend {
             server ${realip}:${realport};
         }
@@ -177,12 +167,12 @@ app.post('/api/proxy/change/port', async (req, res) => {
                 }
             }
         }
-    `;
+    `;*/
 
     try {
         await promisifiedWriteFile("/etc/nginx/nginx.conf", nginxConfig);
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
-        await promisifiedWriteFile("/etc/nginx/web.conf", webConfig);
+        //await promisifiedWriteFile("/etc/nginx/web.conf", webConfig);
 
         await promisifiedExec("sudo ipset flush whitelist");
         await promisifiedExec("sudo systemctl restart nginx");
