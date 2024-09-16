@@ -67,7 +67,7 @@ app.post('/api/ipsetadd', (req, res) => handleIpSetOperation(req, res, 'add'));
 app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
 
 app.post('/api/proxy/change/port', async (req, res) => {
-    const { key, newport, myip, connectport, loadbalancer, domainname, realip, realport } = req.body;
+    const { key, newport, realip, realport } = req.body;
 
     if (![key, newport, myip, connectport, loadbalancer, domainname, realip, realport].every(Boolean)) {
         return res.status(400).send("ERROR: Missing required parameters\n");
