@@ -105,7 +105,6 @@ app.post('/api/proxy/change/port', async (req, res) => {
             tcp_nopush on;
             tcp_nodelay on;
             types_hash_max_size 2048;
-            include /etc/nginx/web.conf;
         }
 
         include /etc/nginx/stream.conf;
@@ -129,50 +128,9 @@ app.post('/api/proxy/change/port', async (req, res) => {
         }
     `;
 
-    /*const webConfig = `
-        upstream backend {
-            server ${realip}:${realport};
-        }
-
-        server {
-            listen ${connectport};
-            server_name ${domainname};
-
-            location / {
-                proxy_set_header Host $host;
-                set_real_ip_from ${loadbalancer};
-                real_ip_header CF-Connecting-IP;					
-                proxy_set_header X-Real-IP ${myip}-$remote_addr;
-                proxy_set_header X-Forwarded-For ${myip}-$remote_addr;
-                proxy_pass_request_headers on;
-                proxy_http_version 1.1;
-                proxy_pass http://backend$request_uri;
-            }
-
-            location /client {
-                allow ${loadbalancer};
-                deny all;
-
-                proxy_set_header Host $host;
-                set_real_ip_from ${loadbalancer};
-                real_ip_header CF-Connecting-IP;					
-                proxy_set_header X-Real-IP ${myip}-$remote_addr;
-                proxy_set_header X-Forwarded-For ${myip}-$remote_addr;
-                proxy_pass_request_headers on;
-                proxy_http_version 1.1;
-                proxy_pass http://backend/client;
-                # Only POST on /client !
-                limit_except POST {
-                    deny  all;
-                }
-            }
-        }
-    `;*/
-
     try {
         await promisifiedWriteFile("/etc/nginx/nginx.conf", nginxConfig);
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
-        //await promisifiedWriteFile("/etc/nginx/web.conf", webConfig);
 
         await promisifiedExec("sudo ipset flush whitelist");
         await promisifiedExec("sudo systemctl restart nginx");
