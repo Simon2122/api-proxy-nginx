@@ -62,24 +62,14 @@ async function handleIpSetOperation(req, res, operation) {
 }
 
 app.use(express.json());
-
 app.post('/api/ipsetadd', (req, res) => handleIpSetOperation(req, res, 'add'));
 app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
 
 app.post('/api/proxy/change/port', async (req, res) => {
-    const {
-        key,
-        newport,
-        myip,
-        connectport,
-        loadbalancer,
-        domainname,
-        realip,
-        realport
-    } = req.body;
+    const { key, newport, realip, realport } = req.body;
 
     // Check if any required parameter is missing
-    if (![key, newport, myip, connectport, loadbalancer, domainname, realip, realport].every(Boolean)) {
+    if (![key, newport, realip, realport].every(Boolean)) {
         return res.status(400).send("ERROR: Missing required parameters\n");
     }
     if (key !== SECRET_KEY) {
@@ -115,7 +105,6 @@ app.post('/api/proxy/change/port', async (req, res) => {
             tcp_nopush on;
             tcp_nodelay on;
             types_hash_max_size 2048;
-            include /etc/nginx/web.conf;
         }
 
         include /etc/nginx/stream.conf;
@@ -139,48 +128,10 @@ app.post('/api/proxy/change/port', async (req, res) => {
         }
     `;
 
-    const webConfig = `
-        upstream backend {
-            server ${realip}:${realport};
-        }
-
-        server {
-            listen ${connectport};
-            server_name ${domainname};
-
-            location / {
-                proxy_set_header Host $host;
-                set_real_ip_from ${loadbalancer};
-                real_ip_header CF-Connecting-IP;					
-                proxy_set_header X-Real-IP ${myip}-$remote_addr;
-                proxy_set_header X-Forwarded-For ${myip}-$remote_addr;
-                proxy_pass_request_headers on;
-                proxy_http_version 1.1;
-                proxy_pass http://backend$request_uri;
-            }
-
-            location /client {
-                proxy_set_header Host $host;
-                set_real_ip_from ${loadbalancer};
-                real_ip_header CF-Connecting-IP;					
-                proxy_set_header X-Real-IP ${myip}-$remote_addr;
-                proxy_set_header X-Forwarded-For ${myip}-$remote_addr;
-                proxy_pass_request_headers on;
-                proxy_http_version 1.1;
-                proxy_pass http://backend/client;
-                # Only POST on /client !
-                limit_except POST {
-                    deny  all;
-                }
-            }
-        }
-    `;
-
     try {
         // Write configuration files sequentially
         await promisifiedWriteFile("/etc/nginx/nginx.conf", nginxConfig);
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
-        await promisifiedWriteFile("/etc/nginx/web.conf", webConfig);
 
         // Flush IP set and restart nginx
         await promisifiedExec("sudo ipset flush whitelist");
