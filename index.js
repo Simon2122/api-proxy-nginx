@@ -112,7 +112,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
     const streamConfig = `
         stream {
             upstream backend {
-                server ${realip};
+                server ${realip}:30120;
             }
             server {
                 listen ${newport};
