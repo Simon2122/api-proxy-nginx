@@ -66,16 +66,9 @@ app.post('/api/ipsetadd', (req, res) => handleIpSetOperation(req, res, 'add'));
 app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
 
 app.post('/api/proxy/change/port', async (req, res) => {
-<<<<<<< HEAD
     const { key, newport, realip, realport } = req.body;
 
-    // Check if any required parameter is missing
     if (![key, newport, realip, realport].every(Boolean)) {
-=======
-    const { key, newport, realip } = req.body;
-
-    if (![key, newport, realip].every(Boolean)) {
->>>>>>> db96af4d7beecd3b45d6045a43573c0a7a2ed8d5
         return res.status(400).send("ERROR: Missing required parameters\n");
     }
     if (key !== SECRET_KEY) {
@@ -147,7 +140,6 @@ app.post('/api/proxy/change/port', async (req, res) => {
         res.status(500).send("ERROR\n");
     }
 });
-
 app.listen(port, () => {
     firewallInit();
     console.log(`Proxy API listening on port ${port}`);
