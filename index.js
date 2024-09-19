@@ -68,7 +68,7 @@ app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
 app.post('/api/proxy/change/port', async (req, res) => {
     const { key, newport, realip } = req.body;
 
-    if (![key, newport, realip].every(Boolean)) {
+    if (!key || !newport || !realip) {
         return res.status(400).send("ERROR: Missing required parameters\n");
     }
     if (key !== SECRET_KEY) {
