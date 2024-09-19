@@ -7,9 +7,9 @@ const port = 8080;
 const SECRET_KEY = 'afterlife897787';
 
 const whitelist = new Set([
-    "148.113.173.203", // Load Balancer
-    "15.235.119.145",  // Server Live
-    "173.177.246.105"  // Home
+    "148.113.201.29", // Load Balancer
+    "51.161.34.239",  // Server Live
+    "142.59.46.224"  // Home
 ]);
 
 const promisifiedExec = promisify(exec);
