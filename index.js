@@ -52,13 +52,7 @@ async function handleIpSetOperation(req, res, operation) {
     if (key !== SECRET_KEY) {
         return res.status(403).send('Forbidden');
     }
-
-    try {
-        await promisifiedExec(`sudo ipset ${operation} whitelist ${ipplayer}`);
-        res.status(200).send(`IP ${operation === 'add' ? 'added to' : 'removed from'} whitelist`);
-    } catch (error) {
-        res.status(500).send(`Error ${operation === 'add' ? 'adding' : 'removing'} IP from ipset: ${error.message}`);
-    }
+    await promisifiedExec(`sudo ipset ${operation} whitelist ${ipplayer}`);
 }
 
 app.use(express.json());
