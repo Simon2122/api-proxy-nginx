@@ -45,14 +45,19 @@ async function firewallInit() {
 
 async function handleIpSetOperation(req, res, operation) {
     const { key, ipplayer } = req.body;
-
     if (!key || !ipplayer) {
         return res.status(400).send('Invalid Request');
     }
     if (key !== SECRET_KEY) {
         return res.status(403).send('Forbidden');
     }
-    await promisifiedExec(`sudo ipset ${operation} whitelist ${ipplayer}`);
+    try {
+        await promisifiedExec(`ipset ${operation} whitelist ${ipplayer} -exist`);
+        console.log(`IPSet ${operation}ed: ${ipplayer}`);
+        res.status(200).send('OK\n');
+    } catch (error) {
+        console.log(`Error: ${error.message}`);
+    }
 }
 
 app.use(express.json());
@@ -89,8 +94,8 @@ app.post('/api/proxy/change/port', async (req, res) => {
     try {
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
 
-        await promisifiedExec("sudo ipset flush whitelist");
-        await promisifiedExec("sudo systemctl restart nginx");
+        await promisifiedExec("ipset flush whitelist");
+        await promisifiedExec("systemctl restart nginx");
 
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
