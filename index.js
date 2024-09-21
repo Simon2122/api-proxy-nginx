@@ -68,41 +68,6 @@ app.post('/api/proxy/change/port', async (req, res) => {
     if (key !== SECRET_KEY) {
         return res.status(403).send('Forbidden');
     }
-
-    const nginxConfig = `
-        user www-data;
-        worker_processes auto;
-        error_log  /var/log/nginx/error.log notice;
-        pid /run/nginx.pid;
-        include /etc/nginx/modules-enabled/*.conf;
-
-        worker_rlimit_nofile 65535;
-
-        events {
-            worker_connections 65535;
-            multi_accept on;
-        }
-
-        http {
-            include       /etc/nginx/mime.types;
-            default_type  application/octet-stream;
-            ssl_protocols TLSv1.2;
-            log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                            '$status $body_bytes_sent "$http_referer" '
-                            '"$http_user_agent" "$http_x_forwarded_for"';
-
-            access_log  /var/log/nginx/access.log  main;
-
-            keepalive_timeout 65;
-            sendfile on;
-            tcp_nopush on;
-            tcp_nodelay on;
-            types_hash_max_size 2048;
-        }
-
-        include /etc/nginx/stream.conf;
-    `;
-
     const streamConfig = `
         stream {
             upstream backend {
@@ -122,7 +87,6 @@ app.post('/api/proxy/change/port', async (req, res) => {
     `;
 
     try {
-        await promisifiedWriteFile("/etc/nginx/nginx.conf", nginxConfig);
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
 
         await promisifiedExec("sudo ipset flush whitelist");
