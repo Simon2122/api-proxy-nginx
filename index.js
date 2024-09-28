@@ -104,6 +104,6 @@ app.post('/api/proxy/change/port', async (req, res) => {
     }
 });
 app.listen(port, () => {
-    firewallInit();
+    firewallInit().catch(error => console.error(`Firewall initialization failed: ${error.message}`));
     console.log(`Proxy API listening on port ${port}`);
 });
