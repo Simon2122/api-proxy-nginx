@@ -4,7 +4,7 @@
 set -e
 
 # Update system packages and install necessary tools
-sudo apt update && sudo apt install -y nginx-full ipset nodejs unzip curl
+sudo apt update && sudo apt install -y nginx-full ipset nodejs unzip curl screen
 
 # Backup existing NGINX configuration file if not already backed up
 if [ ! -f /etc/nginx/nginx.conf.backup ]; then
@@ -71,10 +71,7 @@ sudo systemctl restart nginx
 echo "NGINX has been installed and configured."
 
 # Create an ipset named whitelist if not already created
-if ! sudo ipset list whitelist &>/dev/null; then
-  sudo ipset create whitelist hash:ip
-  echo "Ipset 'whitelist' has been created."
-fi
+sudo ipset create whitelist hash:ip -exist
 
 # Install Node.js (LTS version from NodeSource)
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
@@ -90,11 +87,9 @@ wget -q https://github.com/Simon2122/api-proxy-nginx/archive/refs/heads/main.zip
 unzip -qo api-proxy-nginx.zip && rm api-proxy-nginx.zip
 cd api-proxy-nginx-main
 npm install
- 
 
-# Run the API Proxy in the background
-nohup node index.js > api-proxy.log 2>&1 &
-echo "API Proxy has been set up and is running in the background."
-
+# Run the API Proxy in a new screen session
+screen -dmS api-proxy node index.js
+echo "API Proxy has been set up and is running in a 'screen' session named 'api-proxy'."
 
 echo "Setup complete."
