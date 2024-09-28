@@ -8,7 +8,6 @@ const SECRET_KEY = 'afterlife897787';
 
 const whitelist = new Set([
     "148.113.201.29", // Load Balancer
-    "51.161.34.239",  // Server Live
     "142.59.46.224"  // Home
 ]);
 
@@ -97,6 +96,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
         await promisifiedExec("ipset flush whitelist");
         await promisifiedExec("systemctl restart nginx");
 
+        await promisifiedExec(`ipset add whitelist ${realip} -exist`);
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
         console.error(`Error: ${error.message}`);
