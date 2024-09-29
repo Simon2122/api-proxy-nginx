@@ -1,7 +1,7 @@
 set -e
-
+export PATH=$PATH:/usr/bin:/bin
 # Update system packages and install necessary tools
-sudo apt update && sudo apt install -y nginx-full ipset nodejs unzip curl
+sudo apt update && sudo apt install -y nginx-full ipset nodejs unzip curl cron
 
 # Backup existing NGINX configuration file if not already backed up
 if [ ! -f /etc/nginx/nginx.conf.backup ]; then
@@ -70,6 +70,7 @@ echo "NGINX has been installed and configured."
 # Install Node.js (LTS version from NodeSource)
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
 sudo apt install -y nodejs
+sudo apt install -y npm
 
 # Print Node.js version
 node_version=$(node -v)
