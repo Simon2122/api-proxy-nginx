@@ -7,8 +7,9 @@ const port = 8080;
 const SECRET_KEY = 'afterlife897787';
 
 const whitelist = new Set([
-    "148.113.201.29", // Load Balancer
-    "142.59.46.224"  // Home
+    "45.90.12.107", // Relais
+    "142.59.46.224",  // Home Sim
+    "173.177.246.105" // Home Hit
 ]);
 
 const promisifiedExec = promisify(exec);
