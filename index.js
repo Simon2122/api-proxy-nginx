@@ -29,6 +29,7 @@ async function runCommand(command) {
 }
 
 async function firewallInit() {
+    await promisifiedExec("ipset create whitelist hash:ip -exist");
     const commands = [
         "iptables -F",
         "iptables -A INPUT -i lo -j ACCEPT",

@@ -1,10 +1,7 @@
-#!/bin/bash
-
-# Exit on error
 set -e
 
 # Update system packages and install necessary tools
-sudo apt update && sudo apt install -y nginx-full ipset nodejs unzip curl screen
+sudo apt update && sudo apt install -y nginx-full ipset nodejs unzip curl
 
 # Backup existing NGINX configuration file if not already backed up
 if [ ! -f /etc/nginx/nginx.conf.backup ]; then
@@ -88,8 +85,12 @@ unzip -qo api-proxy-nginx.zip && rm api-proxy-nginx.zip
 cd api-proxy-nginx-main
 npm install
 
-# Run the API Proxy in a new screen session
-screen -dmS api-proxy node index.js
-echo "API Proxy has been set up and is running in a 'screen' session named 'api-proxy'."
+# Run the API Proxy in the background and redirect output to run.log
+node index.js > run.log 2>&1 &
+
+# Add cron job to check if the script is running, and restart if not
+(crontab -l 2>/dev/null; echo "* * * * * pgrep -f 'node index.js' > /dev/null || (cd /api-proxy-nginx-main && node index.js > run.log 2>&1 &)") | crontab -
+
+echo "API Proxy has been set up and is running in the background. Cron job added to restart if the process crashes."
 
 echo "Setup complete."
