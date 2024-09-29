@@ -1,10 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const app = express();
 const port = 8080;
-const SECRET_KEY = 'afterlife897787';
+const SECRET_KEY = process.env.SECRET_KEY
 
 const whitelist = new Set([
     "45.90.12.107", // Relais

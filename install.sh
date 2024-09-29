@@ -67,9 +67,6 @@ EOL
 sudo systemctl restart nginx
 echo "NGINX has been installed and configured."
 
-# Create an ipset named whitelist if not already created
-sudo ipset create whitelist hash:ip -exist
-
 # Install Node.js (LTS version from NodeSource)
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
 sudo apt install -y nodejs
@@ -84,6 +81,9 @@ wget -q https://github.com/Simon2122/api-proxy-nginx/archive/refs/heads/main.zip
 unzip -qo api-proxy-nginx.zip && rm api-proxy-nginx.zip
 cd api-proxy-nginx-main
 npm install
+
+read -p "Enter the new value for SECRET_KEY: " NEW_SECRET_KEY
+echo "SECRET_KEY=${NEW_SECRET_KEY}" | sudo tee /root/api-proxy-nginx-main/.env > /dev/null
 
 # Run the API Proxy in the background and redirect output to run.log
 node index.js > run.log 2>&1 &
