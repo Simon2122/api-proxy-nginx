@@ -30,14 +30,14 @@ async function runCommand(command) {
 }
 
 async function firewallInit() {
-    await promisifiedExec("ipset create whitelist hash:ip -exist");
+    await promisifiedExec("/usr/sbin/ipset create whitelist hash:ip -exist");
     const commands = [
-        "iptables -F",
-        "iptables -A INPUT -i lo -j ACCEPT",
-        ...Array.from(whitelist, ip => `iptables -A INPUT -s ${ip} -j ACCEPT`),
-        "iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
-        "iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
-        "iptables -A INPUT -j DROP"
+        "/usr/sbin/iptables -F",
+        "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
+        ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
+        "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+        "/usr/sbin/iptables -A INPUT -j DROP"
     ];
 
     for (const command of commands) {
@@ -54,7 +54,7 @@ async function handleIpSetOperation(req, res, operation) {
         return res.status(403).send('Forbidden');
     }
     try {
-        await promisifiedExec(`ipset ${operation} whitelist ${ipplayer} -exist`);
+        await promisifiedExec(`/usr/sbin/ipset ${operation} whitelist ${ipplayer} -exist`);
         console.log(`IPSet ${operation}ed: ${ipplayer}`);
         res.status(200).send('OK\n');
     } catch (error) {
@@ -96,10 +96,10 @@ app.post('/api/proxy/change/port', async (req, res) => {
     try {
         await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
 
-        await promisifiedExec("ipset flush whitelist");
+        await promisifiedExec("/usr/sbin/ipset flush whitelist");
         await promisifiedExec("systemctl restart nginx");
 
-        await promisifiedExec(`ipset add whitelist ${realip} -exist`);
+        await promisifiedExec(`/usr/sbin/ipset add whitelist ${realip} -exist`);
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
         console.error(`Error: ${error.message}`);
