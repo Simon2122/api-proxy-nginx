@@ -1,7 +1,8 @@
 set -e
 export PATH=$PATH:/usr/bin:/bin
+
 # Update system packages and install necessary tools
-sudo apt update && sudo apt install -y nginx-full ipset nodejs unzip curl cron
+sudo apt update && sudo apt install -y nginx-full ipset unzip curl
 
 # Backup existing NGINX configuration file if not already backed up
 if [ ! -f /etc/nginx/nginx.conf.backup ]; then
@@ -67,12 +68,11 @@ EOL
 sudo systemctl restart nginx
 echo "NGINX has been installed and configured."
 
-# Install Node.js (LTS version from NodeSource)
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+# Install Node.js and npm via NodeSource (Node.js 18.x)
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt install -y nodejs
-sudo apt install -y npm
 
-# Print Node.js version
+# Print Node.js and npm versions
 node_version=$(node -v)
 npm_version=$(npm -v)
 echo "Node.js $node_version and npm $npm_version have been installed."
@@ -83,15 +83,41 @@ unzip -qo api-proxy-nginx.zip && rm api-proxy-nginx.zip
 cd api-proxy-nginx-main
 npm install
 
+# Ask for the new secret key and set it in the .env file
 read -p "Enter the new value for SECRET_KEY: " NEW_SECRET_KEY
 echo "SECRET_KEY=${NEW_SECRET_KEY}" | sudo tee /root/api-proxy-nginx-main/.env > /dev/null
 
-# Run the API Proxy in the background and redirect output to run.log
-node index.js > run.log 2>&1 &
+# Create a systemd service to run the Node.js script automatically
+sudo tee /etc/systemd/system/api-proxy.service > /dev/null <<EOL
+[Unit]
+Description=API Proxy Service
+After=network.target
 
-# Add cron job to check if the script is running, and restart if not
-(crontab -l 2>/dev/null; echo "* * * * * pgrep -f 'node index.js' > /dev/null || (cd /api-proxy-nginx-main && node index.js > run.log 2>&1 &)") | crontab -
+[Service]
+ExecStart=/usr/bin/node /root/api-proxy-nginx-main/index.js
+Restart=always
+WorkingDirectory=/root/api-proxy-nginx-main
+StandardOutput=append:/root/api-proxy-nginx-main/run.log
+StandardError=append:/root/api-proxy-nginx-main/run.log
+User=root
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=NODE_ENV=production
 
-echo "API Proxy has been set up and is running in the background. Cron job added to restart if the process crashes."
+[Install]
+WantedBy=multi-user.target
+EOL
 
+# Reload systemd to apply the new service
+sudo systemctl daemon-reload
+
+# Enable the service to start on boot
+sudo systemctl enable api-proxy.service
+
+# Start the service immediately
+sudo systemctl start api-proxy.service
+
+# Check the status of the service to confirm it's running
+sudo systemctl status api-proxy.service
+
+echo "API Proxy Service has been set up using systemd and is running."
 echo "Setup complete."
