@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const fs = require('fs');
+const fs = require('fs').promises;
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const app = express();
@@ -14,7 +14,6 @@ const whitelist = new Set([
 ]);
 
 const promisifiedExec = promisify(exec);
-const promisifiedWriteFile = promisify(fs.writeFile);
 
 async function runCommand(command) {
     try {
@@ -94,7 +93,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
     `;
 
     try {
-        await promisifiedWriteFile("/etc/nginx/stream.conf", streamConfig);
+        await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
         await promisifiedExec("/usr/sbin/ipset flush whitelist");
         await promisifiedExec("systemctl restart nginx");
