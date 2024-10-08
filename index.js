@@ -66,9 +66,9 @@ app.post('/api/ipsetadd', (req, res) => handleIpSetOperation(req, res, 'add'));
 app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
 
 app.post('/api/proxy/change/port', async (req, res) => {
-    const { key, newport, realip } = req.body;
+    const { key, newport, realip, backendport } = req.body;
 
-    if (!key || !newport || !realip) {
+    if (!key || !newport || !realip || !backendport) {
         return res.status(400).send("ERROR: Missing required parameters\n");
     }
     if (key !== SECRET_KEY) {
@@ -77,7 +77,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
     const streamConfig = `
         stream {
             upstream backend {
-                server ${realip}:30120;
+                server ${realip}:${backendport};
             }
             server {
                 listen ${newport};
