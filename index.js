@@ -35,6 +35,7 @@ async function firewallInit() {
         "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
         ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
         "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 8080 -m set --match-set whitelist src -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -j DROP"
     ];
