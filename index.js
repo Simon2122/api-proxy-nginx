@@ -30,13 +30,14 @@ async function runCommand(command) {
 
 async function firewallInit() {
     await promisifiedExec("/usr/sbin/ipset create whitelist hash:ip -exist");
+    await promisifiedExec("/usr/sbin/ipset create server hash:ip -exist");
     const commands = [
         "/usr/sbin/iptables -F",
         "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
         ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
         "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
-        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 8080 -m set --match-set whitelist src -j ACCEPT",
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 8080 -m set --match-set server src -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -j DROP"
     ];
 
@@ -92,14 +93,13 @@ app.post('/api/proxy/change/port', async (req, res) => {
             }
         }
     `;
-
     try {
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
         await promisifiedExec("/usr/sbin/ipset flush whitelist");
         await promisifiedExec("systemctl restart nginx");
 
-        await promisifiedExec(`/usr/sbin/ipset add whitelist ${realip} -exist`);
+        await promisifiedExec(`/usr/sbin/ipset add server ${realip} -exist`);
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
         console.error(`Error: ${error.message}`);
