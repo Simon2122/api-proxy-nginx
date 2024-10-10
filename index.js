@@ -35,9 +35,9 @@ async function firewallInit() {
         "/usr/sbin/iptables -F",
         "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
         ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
+        "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
-        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 8080 -m set --match-set server src -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -j DROP"
     ];
 
@@ -97,6 +97,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
         await promisifiedExec("/usr/sbin/ipset flush whitelist");
+        await promisifiedExec("/usr/sbin/ipset flush server");
         await promisifiedExec("systemctl restart nginx");
 
         await promisifiedExec(`/usr/sbin/ipset add server ${realip} -exist`);
