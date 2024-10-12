@@ -29,20 +29,43 @@ async function runCommand(command) {
 }
 
 async function firewallInit() {
-    await promisifiedExec("/usr/sbin/ipset create whitelist hash:ip -exist");
-    await promisifiedExec("/usr/sbin/ipset create server hash:ip -exist");
     const commands = [
+        // Flush existing iptables rules to start with a clean slate
         "/usr/sbin/iptables -F",
+
+        "/usr/sbin/ipset create whitelist hash:ip -exist",
+
+        "/usr/sbin/ipset create server hash:ip -exist",
+
+        // Accept all traffic on the loopback interface
         "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
-        ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
+        
+        // Allow TCP traffic on port 8080 from IPs in the "server" IP set
         "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
+        
+        // Allow UDP traffic from ports 10000 to 60000 for IPs in the "whitelist" IP set
         "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+        
+        // Allow TCP traffic from ports 10000 to 60000 for IPs in the "whitelist" IP set
         "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+        
+        // Allow traffic from whitelisted IPs
+        ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
+
+        // Drop all other traffic
         "/usr/sbin/iptables -A INPUT -j DROP"
     ];
 
-    for (const command of commands) {
-        await runCommand(command);
+    try {
+        for (const command of commands) {
+            const { stdout, stderr } = await promisifiedExec(command);
+            console.log(`Command '${command}' executed successfully.`);
+            if (stderr) {
+                console.error(`Error in command '${command}': ${stderr}`);
+            }
+        }
+    } catch (error) {
+        console.error(`Error executing iptables command: ${error}`);
     }
 }
 
@@ -77,23 +100,42 @@ app.post('/api/proxy/change/port', async (req, res) => {
         return res.status(403).send('Forbidden');
     }
     const streamConfig = `
-        stream {
-            upstream backend {
-                server ${realip}:${backendport};
-            }
-            server {
-                listen ${newport};
-                proxy_socket_keepalive on;
-                proxy_pass backend;
-            }
-            server {
-                listen ${newport} udp reuseport;
-                proxy_socket_keepalive on;
-                proxy_pass backend;
+    stream {
+        upstream backend {
+            server ${realip}:${backendport};
+        }
+        server {
+            listen ${newport} udp reuseport;
+            proxy_socket_keepalive on;
+            proxy_pass backend;
+        }
+    }
+    `;
+
+    const webConfig = `
+    server {
+        listen ${newport};
+
+        server_name _;
+
+        set $backend_ip ${realip}:${backendport};
+
+        location /client {
+            proxy_set_header Host $host;
+            proxy_set_header X-CF-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_pass_request_headers on;
+            proxy_http_version 1.1;
+            proxy_pass http://$backend_ip/client;
+            # Only POST on /client !
+            limit_except POST {
+                deny  all;
             }
         }
+    }
     `;
     try {
+        await fs.writeFile("/etc/nginx/web.conf", webConfig);
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
         await promisifiedExec("/usr/sbin/ipset flush whitelist");
@@ -108,6 +150,10 @@ app.post('/api/proxy/change/port', async (req, res) => {
     }
 });
 app.listen(port, () => {
-    firewallInit().catch(error => console.error(`Firewall initialization failed: ${error.message}`));
-    console.log(`Proxy API listening on port ${port}`);
+    try {
+        firewallInit(); // Ensure this function is called
+        console.log(`Proxy API listening on port ${port}`);
+    } catch (error) {
+        console.error(`Firewall initialization failed: ${error.message}`);
+    }
 });
