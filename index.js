@@ -105,8 +105,11 @@ app.post('/api/proxy/change/port', async (req, res) => {
             server ${realip}:${backendport};
         }
         server {
+		    listen ${newport};
+		    proxy_pass backend;
+	    }
+        server {
             listen ${newport} udp reuseport;
-            proxy_socket_keepalive on;
             proxy_pass backend;
         }
     }
@@ -127,13 +130,18 @@ app.post('/api/proxy/change/port', async (req, res) => {
             proxy_pass_request_headers on;
             proxy_http_version 1.1;
             proxy_pass http://$backend_ip/client;
-            # Only POST on /client !
+            
+            # Only allow POST on /client
             limit_except POST {
-                deny  all;
+                deny all;
             }
         }
-    }
-    `;
+
+        # Block all other connections
+        location / {
+            deny all;
+        }
+    }`;
     try {
         await fs.writeFile("/etc/nginx/web.conf", webConfig);
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
