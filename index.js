@@ -115,7 +115,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
     }
     `;
 
-    const webConfig = `
+    /*const webConfig = `
     server {
         listen ${newport};
 
@@ -136,14 +136,9 @@ app.post('/api/proxy/change/port', async (req, res) => {
                 deny all;
             }
         }
-
-        # Block all other connections
-        location / {
-            deny all;
-        }
-    }`;
+    }`;*/
     try {
-        await fs.writeFile("/etc/nginx/web.conf", webConfig);
+        //await fs.writeFile("/etc/nginx/web.conf", webConfig);
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
         await promisifiedExec("/usr/sbin/ipset flush whitelist");
