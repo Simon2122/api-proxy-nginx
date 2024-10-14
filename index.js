@@ -123,6 +123,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
 
         set $backend_ip ${realip}:${backendport};
 
+        # Allow /client requests
         location /client {
             proxy_set_header Host $host;
             proxy_set_header X-CF-IP $remote_addr;
@@ -135,6 +136,26 @@ app.post('/api/proxy/change/port', async (req, res) => {
             limit_except POST {
                 deny all;
             }
+        }
+
+        # Allow /info.json requests (GET method only)
+        location = /info.json {
+            proxy_set_header Host $host;
+            proxy_set_header X-CF-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_pass_request_headers on;
+            proxy_http_version 1.1;
+            proxy_pass http://$backend_ip/info.json;
+
+            # Only allow GET method
+            limit_except GET {
+                deny all;
+            }
+        }
+
+        # Deny all other requests
+        location / {
+            return 403;
         }
     }`;*/
     try {
@@ -154,7 +175,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
 });
 app.listen(port, () => {
     try {
-        firewallInit(); // Ensure this function is called
+        //firewallInit(); // Ensure this function is called
         console.log(`Proxy API listening on port ${port}`);
     } catch (error) {
         console.error(`Firewall initialization failed: ${error.message}`);
