@@ -53,12 +53,10 @@ stream {
     }
     server {
         listen 36196;
-        proxy_socket_keepalive on;
         proxy_pass backend;
     }
     server {
         listen 36196 udp reuseport;
-        proxy_socket_keepalive on;
         proxy_pass backend;
     }
 }
