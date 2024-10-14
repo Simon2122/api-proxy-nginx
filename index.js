@@ -15,46 +15,44 @@ const whitelist = new Set([
 
 const promisifiedExec = promisify(exec);
 
-async function runCommand(command) {
-    try {
-        const { stdout, stderr } = await promisifiedExec(command);
-        if (stderr) {
-            console.error(`Error executing command '${command}': ${stderr}`);
-        } else {
-            console.log(`Executed: ${command}`);
-        }
-    } catch (error) {
-        console.error(`Execution error: ${error.message}`);
-    }
-}
-
 async function firewallInit() {
     const commands = [
         // Flush existing iptables rules to start with a clean slate
         "/usr/sbin/iptables -F",
 
-        "/usr/sbin/ipset create whitelist hash:ip -exist",
-
-        "/usr/sbin/ipset create server hash:ip -exist",
+        // Create the necessary ipsets if they don't already exist
+        "/usr/sbin/ipset create whitelist hash:ip -exist",  // IPs allowed to connect to the port range
+        "/usr/sbin/ipset create server hash:ip -exist",     // IPs allowed to connect to port 8080
 
         // Accept all traffic on the loopback interface
         "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
-        
-        // Allow TCP traffic on port 8080 from IPs in the "server" IP set
+
+        // Allow related and established connections (keep track of ongoing connections)
+        "/usr/sbin/iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
+
+        // Allow TCP traffic on port 8080 for IPs in the "server" IP set
         "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
-        
-        // Allow UDP traffic from ports 10000 to 60000 for IPs in the "whitelist" IP set
+
+        // Limit UDP traffic on port range 10000-60000 for IPs in the "whitelist" IP set to 1 Mbps per IP
+        "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP",
+
+        // Allow UDP traffic on port range 10000-60000 for IPs in the "whitelist" IP set without hitting the limit
         "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
-        
-        // Allow TCP traffic from ports 10000 to 60000 for IPs in the "whitelist" IP set
-        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
-        
-        // Allow traffic from whitelisted IPs
-        ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
+
+        // Allow TCP traffic on port range 10000-60000 for IPs in the "whitelist" IP set with a limit of 15 requests per minute
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m limit --limit 15/minute --limit-burst 15 -j ACCEPT",
+
+        // Log and reject any packet not matching the rules above (optional for debugging)
+        "/usr/sbin/iptables -A INPUT -j LOG --log-prefix 'iptables-reject: ' --log-level 4",
 
         // Drop all other traffic
         "/usr/sbin/iptables -A INPUT -j DROP"
     ];
+
+    // Add commands to insert IPs into the whitelist
+    whitelist.forEach(ip => {
+        commands.push(`/usr/sbin/ipset add server ${ip} -exist`);
+    });
 
     try {
         for (const command of commands) {
@@ -68,6 +66,7 @@ async function firewallInit() {
         console.error(`Error executing iptables command: ${error}`);
     }
 }
+
 
 async function handleIpSetOperation(req, res, operation) {
     const { key, ipplayer } = req.body;
@@ -114,56 +113,10 @@ app.post('/api/proxy/change/port', async (req, res) => {
         }
     }
     `;
-
-    /*const webConfig = `
-    server {
-        listen ${newport};
-
-        server_name _;
-
-        set $backend_ip ${realip}:${backendport};
-
-        # Allow /client requests
-        location /client {
-            proxy_set_header Host $host;
-            proxy_set_header X-CF-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $remote_addr;
-            proxy_pass_request_headers on;
-            proxy_http_version 1.1;
-            proxy_pass http://$backend_ip/client;
-            
-            # Only allow POST on /client
-            limit_except POST {
-                deny all;
-            }
-        }
-
-        # Allow /info.json requests (GET method only)
-        location = /info.json {
-            proxy_set_header Host $host;
-            proxy_set_header X-CF-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $remote_addr;
-            proxy_pass_request_headers on;
-            proxy_http_version 1.1;
-            proxy_pass http://$backend_ip/info.json;
-
-            # Only allow GET method
-            limit_except GET {
-                deny all;
-            }
-        }
-
-        # Deny all other requests
-        location / {
-            return 403;
-        }
-    }`;*/
     try {
-        //await fs.writeFile("/etc/nginx/web.conf", webConfig);
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
         await promisifiedExec("/usr/sbin/ipset flush whitelist");
-        await promisifiedExec("/usr/sbin/ipset flush server");
         await promisifiedExec("systemctl restart nginx");
 
         await promisifiedExec(`/usr/sbin/ipset add server ${realip} -exist`);
@@ -175,7 +128,7 @@ app.post('/api/proxy/change/port', async (req, res) => {
 });
 app.listen(port, () => {
     try {
-        //firewallInit(); // Ensure this function is called
+        firewallInit(); // Ensure this function is called
         console.log(`Proxy API listening on port ${port}`);
     } catch (error) {
         console.error(`Firewall initialization failed: ${error.message}`);
