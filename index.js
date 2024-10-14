@@ -42,8 +42,17 @@ async function firewallInit() {
         // Allow UDP traffic on port range 10000-60000 for IPs in the "whitelist" IP set without hitting the limit
         "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
 
-        // Allow TCP traffic on port range 10000-60000 for IPs in the "whitelist" IP set with a limit of 15 requests per minute
-        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m limit --limit 15/minute --limit-burst 15 -j ACCEPT",
+        // SYN flood protection: Limit SYN packets per IP
+        "/usr/sbin/iptables -A INPUT -p tcp --syn -m connlimit --connlimit-above 16 -j DROP",
+
+        // Set up a tracking mechanism for new TCP connections on the port range 10000-60000 for whitelisted IPs
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m state --state NEW -m recent --set",
+
+        // Limit new TCP connections on the port range 10000-60000 for whitelisted IPs to 15 per minute
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP",
+
+        // Allow remaining TCP connections within the limit
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
 
         // Log and reject any packet not matching the rules above (optional for debugging)
         "/usr/sbin/iptables -A INPUT -j LOG --log-prefix 'iptables-reject: ' --log-level 4",
@@ -54,17 +63,20 @@ async function firewallInit() {
 
     try {
         for (const command of commands) {
-            const { stdout, stderr } = await promisifiedExec(command);
-            console.log(`Command '${command}' executed successfully.`);
-            if (stderr) {
-                console.error(`Error in command '${command}': ${stderr}`);
+            try {
+                const { stdout, stderr } = await promisifiedExec(command);
+                console.log(`Command '${command}' executed successfully.`);
+                if (stderr) {
+                    console.error(`Warning in command '${command}': ${stderr}`);
+                }
+            } catch (cmdError) {
+                console.error(`Error executing command '${command}': ${cmdError}`);
             }
         }
     } catch (error) {
-        console.error(`Error executing iptables command: ${error}`);
+        console.error(`Unexpected error during firewall initialization: ${error}`);
     }
 }
-
 
 async function handleIpSetOperation(req, res, operation) {
     const { key, ipplayer } = req.body;
