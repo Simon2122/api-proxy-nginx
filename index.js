@@ -29,6 +29,9 @@ async function firewallInit() {
 
         // Allow related and established connections (keep track of ongoing connections)
         "/usr/sbin/iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
+        
+        // Allow traffic from whitelisted IPs to any port
+        ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
 
         // Allow TCP traffic on port 8080 for IPs in the "server" IP set
         "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
@@ -48,11 +51,6 @@ async function firewallInit() {
         // Drop all other traffic
         "/usr/sbin/iptables -A INPUT -j DROP"
     ];
-
-    // Add commands to insert IPs into the whitelist
-    whitelist.forEach(ip => {
-        commands.push(`/usr/sbin/ipset add server ${ip} -exist`);
-    });
 
     try {
         for (const command of commands) {
