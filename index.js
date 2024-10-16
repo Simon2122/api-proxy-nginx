@@ -15,6 +15,9 @@ const whitelist = new Set([
 
 const promisifiedExec = promisify(exec);
 
+const IsIpv4 = (ip) => /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip);
+
+
 async function firewallInit() {
     const commands = [
         // Flush existing iptables rules to start with a clean slate
@@ -83,6 +86,12 @@ async function handleIpSetOperation(req, res, operation) {
     if (!key || !ipplayer) {
         return res.status(400).send('Invalid Request');
     }
+    if (!IsIpv4(ipplayer)) {
+        return res.status(400).send('Invalid Request');
+    }
+    if (!['add', 'del'].includes(operation)) {
+        return res.status(400).send('Invalid Operation');
+    }
     if (key !== SECRET_KEY) {
         return res.status(403).send('Forbidden');
     }
@@ -108,6 +117,17 @@ app.post('/api/proxy/change/port', async (req, res) => {
     if (key !== SECRET_KEY) {
         return res.status(403).send('Forbidden');
     }
+    if (!IsIpv4(realip)) {
+        return res.status(400).send("Invalid real IP");
+    }
+
+    if (isNaN(backendport) || backendport < 1 || backendport > 65535) {
+        return res.status(400).send("Invalid backend port");
+    }
+    if (isNaN(newport) || newport < 10000 || newport > 60000) {
+        return res.status(400).send("Invalid new port");
+    }
+    
     const streamConfig = `
     stream {
         upstream backend {
@@ -126,11 +146,11 @@ app.post('/api/proxy/change/port', async (req, res) => {
     try {
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
-        await promisifiedExec("/usr/sbin/ipset flush server");
-        await promisifiedExec("/usr/sbin/ipset flush whitelist");
-        await promisifiedExec("systemctl restart nginx");
+        await promisifiedExec("/usr/sbin/ipset", ['flush', 'server']);
+        await promisifiedExec("/usr/sbin/ipset", ['flush', 'whitelist']);
+        await promisifiedExec("systemctl", ['restart', 'nginx']);
 
-        await promisifiedExec(`/usr/sbin/ipset add server ${realip} -exist`);
+        await promisifiedExec("/usr/sbin/ipset", ['add', 'server', realip, '-exist']);
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
         console.error(`Error: ${error.message}`);
