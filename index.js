@@ -36,11 +36,11 @@ async function firewallInit() {
         // Allow TCP traffic on port 8080 for IPs in the "server" IP set
         "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
 
-        // Limit UDP traffic on port range 10000-60000 for IPs in the "whitelist" IP set to 1 Mbps per IP
-        "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP",
-
         // Allow UDP traffic on port range 10000-60000 for IPs in the "whitelist" IP set without hitting the limit
         "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+
+        // Limit UDP traffic on port range 10000-60000 for IPs in the "whitelist" IP set to 1 Mbps per IP
+        "/usr/sbin/iptables -A INPUT -p udp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP",
 
         // SYN flood protection: Limit SYN packets per IP
         "/usr/sbin/iptables -A INPUT -p tcp --syn -m connlimit --connlimit-above 16 -j DROP",
@@ -48,11 +48,11 @@ async function firewallInit() {
         // Set up a tracking mechanism for new TCP connections on the port range 10000-60000 for whitelisted IPs
         "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m state --state NEW -m recent --set",
 
-        // Limit new TCP connections on the port range 10000-60000 for whitelisted IPs to 15 per minute
-        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP",
-
         // Allow remaining TCP connections within the limit
         "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
+
+        // Limit new TCP connections on the port range 10000-60000 for whitelisted IPs to 15 per minute
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP",,
 
         // Log and reject any packet not matching the rules above (optional for debugging)
         "/usr/sbin/iptables -A INPUT -j LOG --log-prefix 'iptables-reject: ' --log-level 4",
