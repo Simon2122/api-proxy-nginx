@@ -146,11 +146,11 @@ app.post('/api/proxy/change/port', async (req, res) => {
     try {
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
 
-        await promisifiedExec("/usr/sbin/ipset", ['flush', 'server']);
-        await promisifiedExec("/usr/sbin/ipset", ['flush', 'whitelist']);
-        await promisifiedExec("systemctl", ['restart', 'nginx']);
+        await promisifiedExec("/usr/sbin/ipset flush server");
+        await promisifiedExec("/usr/sbin/ipset flush whitelist");
+        await promisifiedExec("systemctl restart nginx");
 
-        await promisifiedExec("/usr/sbin/ipset", ['add', 'server', realip, '-exist']);
+        await promisifiedExec(`/usr/sbin/ipset add server ${realip} -exist`);
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
         console.error(`Error: ${error.message}`);
