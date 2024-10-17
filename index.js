@@ -55,7 +55,7 @@ async function firewallInit() {
         "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -j ACCEPT",
 
         // Limit new TCP connections on the port range 10000-60000 for whitelisted IPs to 15 per minute
-        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP",,
+        "/usr/sbin/iptables -A INPUT -p tcp -m multiport --dports 10000:60000 -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP",
 
         // Log and reject any packet not matching the rules above (optional for debugging)
         "/usr/sbin/iptables -A INPUT -j LOG --log-prefix 'iptables-reject: ' --log-level 4",
