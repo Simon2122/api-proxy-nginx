@@ -32,6 +32,9 @@ async function firewallInit() {
 
         // Allow related and established connections (keep track of ongoing connections)
         "/usr/sbin/iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
+
+        // Allow ICMP traffic
+        "/usr/sbin/iptables -A INPUT -p icmp -j ACCEPT",
         
         // Allow traffic from whitelisted IPs to any port
         ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
