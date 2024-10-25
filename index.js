@@ -103,6 +103,7 @@ async function handleIpSetOperation(req, res, operation) {
         console.log(`IPSet ${operation}ed: ${ipplayer}`);
         res.status(200).send('OK\n');
     } catch (error) {
+        res.status(500).send(`Server Error: ${error.message}`);
         console.log(`Error: ${error.message}`);
     }
 }
