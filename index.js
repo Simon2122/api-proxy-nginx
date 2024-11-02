@@ -115,7 +115,6 @@ async function handlePortChange(req, res) {
 
     try {
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
-        console.log("updateIptablesRules")
         await updateIptablesRules(newport);
         await promisifiedExec("systemctl restart nginx");
 
