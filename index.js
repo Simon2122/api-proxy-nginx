@@ -45,14 +45,14 @@ async function updateIptablesRules(newport) {
     const removeOldRules = [
         `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -j ACCEPT`,
         `/usr/sbin/iptables -D INPUT -p udp --dport ${previousPort} -m set --match-set whitelist src -j ACCEPT`,
-        `/usr/sbin/iptables -D nat -A PREROUTING -p tcp --dport ${previousPort} -j REDIRECT --to-port 11702`,
+        `/usr/sbin/iptables -t nat -D PREROUTING -p tcp --dport ${previousPort} -j REDIRECT --to-port 11702`,
         `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -m state --state NEW -m recent --set`,
         `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP`,
         `/usr/sbin/iptables -D INPUT -p udp --dport ${previousPort} -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP`,
         "/usr/sbin/iptables -D INPUT -p tcp --syn -m connlimit --connlimit-above 16 -j DROP",
         "/usr/sbin/iptables -D INPUT -j DROP"
     ];
-
+    
     const addNewRules = [
         `/usr/sbin/iptables -A INPUT -p tcp --dport ${newport} -m set --match-set whitelist src -j ACCEPT`,
         `/usr/sbin/iptables -A INPUT -p udp --dport ${newport} -m set --match-set whitelist src -j ACCEPT`,
