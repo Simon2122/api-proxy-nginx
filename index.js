@@ -45,6 +45,7 @@ async function updateIptablesRules(newport) {
     const removeOldRules = [
         `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -j ACCEPT`,
         `/usr/sbin/iptables -D INPUT -p udp --dport ${previousPort} -m set --match-set whitelist src -j ACCEPT`,
+        `/usr/sbin/iptables -D nat -A PREROUTING -p tcp --dport ${previousPort} -j REDIRECT --to-port 11702`,
         `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -m state --state NEW -m recent --set`,
         `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP`,
         `/usr/sbin/iptables -D INPUT -p udp --dport ${previousPort} -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP`,
@@ -55,6 +56,7 @@ async function updateIptablesRules(newport) {
     const addNewRules = [
         `/usr/sbin/iptables -A INPUT -p tcp --dport ${newport} -m set --match-set whitelist src -j ACCEPT`,
         `/usr/sbin/iptables -A INPUT -p udp --dport ${newport} -m set --match-set whitelist src -j ACCEPT`,
+        `/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport ${newport} -j REDIRECT --to-port 11702`,
         `/usr/sbin/iptables -A INPUT -p tcp --dport ${newport} -m set --match-set whitelist src -m state --state NEW -m recent --set`,
         `/usr/sbin/iptables -A INPUT -p tcp --dport ${newport} -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP`,
         `/usr/sbin/iptables -A INPUT -p udp --dport ${newport} -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP`,
@@ -103,11 +105,11 @@ async function handlePortChange(req, res) {
             server ${realip}:${backendport};
         }
         server {
-            listen ${newport};
+            listen 11702;
             proxy_pass backend;
         }
         server {
-            listen ${newport} udp reuseport;
+            listen ${newport} udp;
             proxy_pass backend;
         }
     }
