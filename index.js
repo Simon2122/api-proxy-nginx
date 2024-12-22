@@ -29,7 +29,6 @@ async function firewallInit() {
         "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
         `/usr/sbin/iptables -A INPUT -p tcp --dport 10000:60000 -m set --match-set whitelist src -j ACCEPT`,
         `/usr/sbin/iptables -A INPUT -p udp --dport 10000:60000 -m set --match-set whitelist src -j ACCEPT`,
-        `/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport 10000:60000 -j REDIRECT --to-port 11702`,
         "/usr/sbin/iptables -A INPUT -j LOG --log-prefix 'iptables-reject: ' --log-level 4",
         "/usr/sbin/iptables -A INPUT -p tcp --syn -m connlimit --connlimit-above 16 -j DROP",
         "/usr/sbin/iptables -A INPUT -j DROP"
@@ -67,11 +66,13 @@ async function handlePortChange(req, res) {
             server ${realip}:${backendport};
         }
         server {
-            listen 11702;
+            listen ${newport};
+            proxy_socket_keepalive on;
             proxy_pass backend;
         }
         server {
-            listen ${newport} udp;
+            listen ${newport} udp reuseport;
+            proxy_socket_keepalive on;
             proxy_pass backend;
         }
     }
