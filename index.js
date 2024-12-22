@@ -8,8 +8,6 @@ const port = 8080;
 const SECRET_KEY = process.env.SECRET_KEY;
 const promisifiedExec = promisify(exec);
 
-let previousPort = 0; // Global variable to keep track of the last assigned port
-
 const whitelist = new Set([
     "148.113.196.69", // Relais
     "142.59.46.224",  // Home Sim
@@ -21,6 +19,7 @@ const IsIpv4 = (ip) => /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][
 async function firewallInit() {
     const commands = [
         "/usr/sbin/iptables -F", // Flush existing iptables rules
+        "/usr/sbin/iptables -t nat -F PREROUTING", // Flush PREROUTING chain in nat table
         "/usr/sbin/ipset create whitelist hash:ip -exist",
         "/usr/sbin/ipset create server hash:ip -exist",
         "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
@@ -28,6 +27,9 @@ async function firewallInit() {
         "/usr/sbin/iptables -A INPUT -p icmp -j ACCEPT",
         ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
         "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
+        `/usr/sbin/iptables -A INPUT -p tcp --dport 10000:60000 -m set --match-set whitelist src -j ACCEPT`,
+        `/usr/sbin/iptables -A INPUT -p udp --dport 10000:60000 -m set --match-set whitelist src -j ACCEPT`,
+        `/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport 10000:60000 -j REDIRECT --to-port 11702`,
         "/usr/sbin/iptables -A INPUT -j LOG --log-prefix 'iptables-reject: ' --log-level 4",
         "/usr/sbin/iptables -A INPUT -p tcp --syn -m connlimit --connlimit-above 16 -j DROP",
         "/usr/sbin/iptables -A INPUT -j DROP"
@@ -39,46 +41,6 @@ async function firewallInit() {
         );
     }
     console.log("Base firewall initialized");
-}
-
-async function updateIptablesRules(newport) {
-    const removeOldRules = [
-        `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -j ACCEPT`,
-        `/usr/sbin/iptables -D INPUT -p udp --dport ${previousPort} -m set --match-set whitelist src -j ACCEPT`,
-        `/usr/sbin/iptables -t nat -D PREROUTING -p tcp --dport ${previousPort} -j REDIRECT --to-port 11702`,
-        `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -m state --state NEW -m recent --set`,
-        `/usr/sbin/iptables -D INPUT -p tcp --dport ${previousPort} -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP`,
-        `/usr/sbin/iptables -D INPUT -p udp --dport ${previousPort} -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP`,
-        "/usr/sbin/iptables -D INPUT -p tcp --syn -m connlimit --connlimit-above 16 -j DROP",
-        "/usr/sbin/iptables -D INPUT -j DROP"
-    ];
-    
-    const addNewRules = [
-        `/usr/sbin/iptables -A INPUT -p tcp --dport ${newport} -m set --match-set whitelist src -j ACCEPT`,
-        `/usr/sbin/iptables -A INPUT -p udp --dport ${newport} -m set --match-set whitelist src -j ACCEPT`,
-        `/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport ${newport} -j REDIRECT --to-port 11702`,
-        `/usr/sbin/iptables -A INPUT -p tcp --dport ${newport} -m set --match-set whitelist src -m state --state NEW -m recent --set`,
-        `/usr/sbin/iptables -A INPUT -p tcp --dport ${newport} -m set --match-set whitelist src -m state --state NEW -m recent --update --seconds 60 --hitcount 15 -j DROP`,
-        `/usr/sbin/iptables -A INPUT -p udp --dport ${newport} -m set --match-set whitelist src -m hashlimit --hashlimit-name udp_limit --hashlimit-above 1mbit/sec --hashlimit-mode srcip --hashlimit-htable-expire 10000 -j DROP`,
-        "/usr/sbin/iptables -A INPUT -p tcp --syn -m connlimit --connlimit-above 16 -j DROP",
-        "/usr/sbin/iptables -A INPUT -j DROP"
-    ];
-
-    try {
-        for (const command of removeOldRules) {
-            await promisifiedExec(command).catch((err) =>
-                console.log(`Skipping rule removal: ${err.message}`)
-            );
-        }
-
-        for (const command of addNewRules) {
-            await promisifiedExec(command);
-        }
-
-        console.log(`iptables rules updated for new port ${newport}`);
-    } catch (error) {
-        console.error(`Failed to update iptables rules: ${error.message}`);
-    }
 }
 
 async function handlePortChange(req, res) {
@@ -117,14 +79,12 @@ async function handlePortChange(req, res) {
 
     try {
         await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
-        await updateIptablesRules(newport);
         await promisifiedExec("systemctl restart nginx");
 
         await promisifiedExec(`/usr/sbin/ipset flush whitelist`);
         await promisifiedExec(`/usr/sbin/ipset flush server`);
         await promisifiedExec(`/usr/sbin/ipset add server ${realip} -exist`);
 
-        previousPort = newport; // Update previous port
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
         console.error(`Error: ${error.message}`);
