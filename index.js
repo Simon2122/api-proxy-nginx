@@ -61,21 +61,21 @@ async function handlePortChange(req, res) {
         return res.status(400).send("Invalid new port");
     }
     const streamConfig = `
-    stream {
-        upstream backend {
-            server ${realip}:${backendport};
+        stream {
+            upstream backend {
+                server ${realip}:${backendport};
+            }
+            server {
+                listen ${newport};
+                proxy_socket_keepalive on;
+                proxy_pass backend;
+            }
+            server {
+                listen ${newport} udp reuseport;
+                proxy_socket_keepalive on;
+                proxy_pass backend;
+            }
         }
-        server {
-            listen ${newport};
-            proxy_socket_keepalive on;
-            proxy_pass backend;
-        }
-        server {
-            listen ${newport} udp reuseport;
-            proxy_socket_keepalive on;
-            proxy_pass backend;
-        }
-    }
     `;
 
     try {

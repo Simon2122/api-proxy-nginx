@@ -14,18 +14,36 @@ fi
 sudo tee /etc/nginx/nginx.conf > /dev/null <<EOL
 user www-data;
 worker_processes auto;
-error_log  /var/log/nginx/error.log notice;
 pid /run/nginx.pid;
+error_log /var/log/nginx/error.log;
 include /etc/nginx/modules-enabled/*.conf;
 
 worker_rlimit_nofile 65535;
 
 events {
-    worker_connections 65535;
-    multi_accept on;
+        worker_connections 65535;
+        multi_accept on;
+}
+
+http {
+        sendfile on;
+        tcp_nopush on;
+        types_hash_max_size 2048;
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3; # Dropping SSLv3, ref: POODLE
+        ssl_prefer_server_ciphers on;
+        access_log /var/log/nginx/access.log;
+
+        gzip on;
+
+        include /etc/nginx/conf.d/*.conf;
+        include /etc/nginx/sites-enabled/*;
 }
 
 include /etc/nginx/stream.conf;
+
 EOL
 
 # Create stream.conf file
