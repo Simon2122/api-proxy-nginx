@@ -10,7 +10,7 @@ const promisifiedExec = promisify(exec);
 
 const whitelist = new Set([
     "148.113.196.69", // Relais
-    "142.59.46.224",  // Home Sim
+    "75.152.35.18",  // Home Sim
     "173.177.246.105" // Home Hit
 ]);
 
@@ -19,14 +19,11 @@ const IsIpv4 = (ip) => /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][
 async function firewallInit() {
     const commands = [
         "/usr/sbin/iptables -F", // Flush existing iptables rules
-        "/usr/sbin/iptables -t nat -F PREROUTING", // Flush PREROUTING chain in nat table
         "/usr/sbin/ipset create whitelist hash:ip -exist",
-        "/usr/sbin/ipset create server hash:ip -exist",
         "/usr/sbin/iptables -A INPUT -i lo -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
         "/usr/sbin/iptables -A INPUT -p icmp -j ACCEPT",
         ...Array.from(whitelist, ip => `/usr/sbin/iptables -A INPUT -s ${ip} -j ACCEPT`),
-        "/usr/sbin/iptables -A INPUT -p tcp --dport 8080 -m set --match-set server src -j ACCEPT",
         `/usr/sbin/iptables -A INPUT -p tcp --dport 10000:60000 -m set --match-set whitelist src -j ACCEPT`,
         `/usr/sbin/iptables -A INPUT -p udp --dport 10000:60000 -m set --match-set whitelist src -j ACCEPT`,
         "/usr/sbin/iptables -A INPUT -j LOG --log-prefix 'iptables-reject: ' --log-level 4",
@@ -83,8 +80,6 @@ async function handlePortChange(req, res) {
         await promisifiedExec("systemctl restart nginx");
 
         await promisifiedExec(`/usr/sbin/ipset flush whitelist`);
-        await promisifiedExec(`/usr/sbin/ipset flush server`);
-        await promisifiedExec(`/usr/sbin/ipset add server ${realip} -exist`);
 
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
