@@ -16,6 +16,13 @@ const whitelist = new Set([
 
 const IsIpv4 = (ip) => /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip);
 
+const restrictToAllowedIP = (req, res, next) => {
+    if (req.ip !== Array.from(whitelist)[0]) {
+        return res.status(403).send('Forbidden: Access restricted to the allowed IP.');
+    }
+    next();
+};
+
 async function firewallInit() {
     const commands = [
         "/usr/sbin/iptables -F", // Flush existing iptables rules
@@ -112,9 +119,9 @@ async function handleIpSetOperation(req, res, operation) {
 }
 
 app.use(express.json());
-app.post('/api/ipsetadd', (req, res) => handleIpSetOperation(req, res, 'add'));
-app.post('/api/ipsetdel', (req, res) => handleIpSetOperation(req, res, 'del'));
-app.post('/api/proxy/change/port', handlePortChange);
+app.post('/api/ipsetadd', restrictToAllowedIP, (req, res) => handleIpSetOperation(req, res, 'add'));
+app.post('/api/ipsetdel', restrictToAllowedIP, (req, res) => handleIpSetOperation(req, res, 'del'));
+app.post('/api/proxy/change/port', restrictToAllowedIP, handlePortChange);
 
 app.listen(port, async () => {
     await firewallInit(); // Initialize base firewall on startup
