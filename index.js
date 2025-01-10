@@ -17,7 +17,7 @@ const whitelist = new Set([
 const IsIpv4 = (ip) => /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip);
 
 const restrictToAllowedIP = (req, res, next) => {
-    if (req.ip !== Array.from(whitelist)[0]) {
+    if (!whitelist.has(req.ip.replace('::ffff:', ''))) {
         return res.status(403).send('Forbidden: Access restricted to the allowed IP.');
     }
     next();
