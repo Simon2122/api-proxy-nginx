@@ -71,13 +71,16 @@ async function handlePortChange(req, res) {
             }
             server {
                 listen ${newport};
+                proxy_connect_timeout 5s;
                 proxy_socket_keepalive on;
                 proxy_pass backend;
             }
             server {
                 listen ${newport} udp reuseport;
+                proxy_connect_timeout 5s;
                 proxy_socket_keepalive on;
                 proxy_pass backend;
+                proxy_timeout 5s;
             }
         }
     `;
