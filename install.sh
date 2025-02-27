@@ -32,15 +32,20 @@ EOL
 sudo tee /etc/nginx/stream.conf > /dev/null <<EOL
 stream {
     upstream backend {
-        server 51.161.34.239:30120;
+        server 142.44.138.88:8443;
     }
     server {
-        listen 36196;
+        listen 31918;
+        proxy_connect_timeout 5s;
+        proxy_socket_keepalive on;
         proxy_pass backend;
     }
     server {
-        listen 36196 udp reuseport;
+        listen 31918 udp reuseport;
+        proxy_connect_timeout 5s;
+        proxy_socket_keepalive on;
         proxy_pass backend;
+        proxy_timeout 5s;
     }
 }
 EOL
