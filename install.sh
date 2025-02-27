@@ -59,7 +59,7 @@ npm_version=$(npm -v)
 echo "Node.js $node_version and npm $npm_version have been installed."
 
 # Download and set up api-proxy-nginx repository
-wget -q https://github.com/Simon2122/api-proxy-nginx/archive/refs/heads/main.zip -O api-proxy-nginx.zip
+wget --header="Authorization: token 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" -q https://github.com/Simon2122/api-proxy-nginx/archive/refs/heads/main.zip -O api-proxy-nginx.zip
 unzip -qo api-proxy-nginx.zip && rm api-proxy-nginx.zip
 cd api-proxy-nginx-main
 npm install
