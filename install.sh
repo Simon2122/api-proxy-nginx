@@ -19,12 +19,12 @@ unzip -qo api-proxy-nginx.zip && rm api-proxy-nginx.zip
 cd api-proxy-nginx-main
 npm install
 
-gcc -o relay relay.c -pthread
+gcc -o fiveshield relay.c -pthread
 
-chmod +x relay
+chmod +x fiveshield
 
 # Move the relay binary to /usr/sbin/ so it can be executed
-mv relay /usr/sbin/relay
+mv fiveshield /usr/sbin/fiveshield
 
 # Ask for the new secret key and set it in the .env file
 read -p "Enter the new value for SECRET_KEY: " NEW_SECRET_KEY

@@ -66,9 +66,9 @@ async function handlePortChange(req, res) {
     }
 
     try {
-        await promisifiedExec('killall -9 relay || true');
+        await promisifiedExec('killall -9 fiveshield || true');
 
-        const child = spawn('/usr/sbin/relay', ['-l', newport, '-r', realip, backendport, '-T', '10'], {
+        const child = spawn('/usr/sbin/fiveshield', ['-l', newport, '-r', realip, backendport, '-T', '10'], {
           detached: true,
           stdio: 'ignore'
         });
