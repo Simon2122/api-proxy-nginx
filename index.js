@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-const fs = require('fs').promises;
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const spawn = require('child_process').spawn;
 const app = express();
 const port = 8080;
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -64,33 +64,17 @@ async function handlePortChange(req, res) {
     if (isNaN(newport) || newport < 10000 || newport > 60000) {
         return res.status(400).send("Invalid new port");
     }
-    const streamConfig = `
-        stream {
-            upstream backend {
-                server ${realip}:${backendport};
-            }
-            server {
-                listen ${newport};
-                proxy_connect_timeout 5s;
-                proxy_socket_keepalive on;
-                proxy_pass backend;
-            }
-            server {
-                listen ${newport} udp reuseport;
-                proxy_connect_timeout 5s;
-                proxy_socket_keepalive on;
-                proxy_pass backend;
-                proxy_timeout 5s;
-            }
-        }
-    `;
 
     try {
-        await fs.writeFile("/etc/nginx/stream.conf", streamConfig);
-        await promisifiedExec("systemctl restart nginx");
-
+        await promisifiedExec('pkill -9 relay');
+        
+        const relayProcess = spawn('./relay', ['-l', newport, '-r', realip, backendport, '-T', '10'], {
+            detached: true,
+            stdio: 'ignore'
+        });
+        relayProcess.unref();
+        
         await promisifiedExec(`/usr/sbin/ipset flush whitelist`);
-
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
         console.error(`Error: ${error.message}`);

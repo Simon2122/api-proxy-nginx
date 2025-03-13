@@ -2,57 +2,7 @@ set -e
 export PATH=$PATH:/usr/bin:/bin
 
 # Update system packages and install necessary tools
-sudo apt update && sudo apt install -y nginx-full ipset unzip curl
-
-# Backup existing NGINX configuration file if not already backed up
-if [ ! -f /etc/nginx/nginx.conf.backup ]; then
-  sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup
-  echo "Backed up nginx.conf to nginx.conf.backup."
-fi
-
-# Create the nginx.conf file with the specified configurations
-sudo tee /etc/nginx/nginx.conf > /dev/null <<EOL
-user www-data;
-worker_processes auto;
-pid /run/nginx.pid;
-error_log /var/log/nginx/error.log;
-include /etc/nginx/modules-enabled/*.conf;
-
-worker_rlimit_nofile 65535;
-
-events {
-        worker_connections 65535;
-        multi_accept on;
-}
-include /etc/nginx/stream.conf;
-
-EOL
-
-# Create stream.conf file
-sudo tee /etc/nginx/stream.conf > /dev/null <<EOL
-stream {
-    upstream backend {
-        server 142.44.138.88:8443;
-    }
-    server {
-        listen 31918;
-        proxy_connect_timeout 5s;
-        proxy_socket_keepalive on;
-        proxy_pass backend;
-    }
-    server {
-        listen 31918 udp reuseport;
-        proxy_connect_timeout 5s;
-        proxy_socket_keepalive on;
-        proxy_pass backend;
-        proxy_timeout 5s;
-    }
-}
-EOL
-
-# Start and enable NGINX
-sudo systemctl restart nginx
-echo "NGINX has been installed and configured."
+sudo apt update && sudo apt install -y gcc ipset unzip curl
 
 # Install Node.js and npm via NodeSource (Node.js 18.x)
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -68,6 +18,8 @@ wget -q https://github.com/Simon2122/api-proxy-nginx/archive/refs/heads/main.zip
 unzip -qo api-proxy-nginx.zip && rm api-proxy-nginx.zip
 cd api-proxy-nginx-main
 npm install
+
+gcc -o relay relay.c -pthread
 
 # Ask for the new secret key and set it in the .env file
 read -p "Enter the new value for SECRET_KEY: " NEW_SECRET_KEY
