@@ -21,7 +21,10 @@ npm install
 
 gcc -o relay relay.c -pthread
 
-mv relay /usr/sbin/
+chmod +x relay
+
+# Move the relay binary to /usr/sbin/ so it can be executed
+mv relay /usr/sbin/relay
 
 # Ask for the new secret key and set it in the .env file
 read -p "Enter the new value for SECRET_KEY: " NEW_SECRET_KEY

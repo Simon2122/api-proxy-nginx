@@ -67,11 +67,13 @@ async function handlePortChange(req, res) {
 
     try {
         await promisifiedExec('killall -9 relay || true');
+
         const child = spawn('/usr/sbin/relay', ['-l', newport, '-r', realip, backendport, '-T', '10'], {
           detached: true,
           stdio: 'ignore'
         });
         child.unref();
+        
         await promisifiedExec(`/usr/sbin/ipset flush whitelist`);
         res.status(200).send(`OK ${newport}\n`);
     } catch (error) {
