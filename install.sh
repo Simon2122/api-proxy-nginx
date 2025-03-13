@@ -21,6 +21,8 @@ npm install
 
 gcc -o relay relay.c -pthread
 
+mv relay /usr/sbin/
+
 # Ask for the new secret key and set it in the .env file
 read -p "Enter the new value for SECRET_KEY: " NEW_SECRET_KEY
 echo "SECRET_KEY=${NEW_SECRET_KEY}" | sudo tee /root/api-proxy-nginx-main/.env > /dev/null
